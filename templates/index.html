@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitorovanie senzorov</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Nadpis -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Monitorovanie senzorov</h1>
+            <p class="text-gray-600">Aktuálne údaje o teplote a vlhkosti</p>
+        </div>
+
+        <!-- Navigácia -->
+        <div class="mb-6 flex space-x-4">
+            <button onclick="window.location.href='/history'" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+                História
+            </button>
+            <button onclick="downloadCurrentLog()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                Stiahnuť log
+            </button>
+        </div>
+
+        <!-- Grafy -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">Teplota</h2>
+                <canvas id="temperatureChart"></canvas>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">Vlhkosť</h2>
+                <canvas id="humidityChart"></canvas>
+            </div>
+        </div>
+
+
+        <!-- tabuľka údajov -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Senzor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teplota (°C)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vlhkosť (%)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Čas</th>
+                    </tr>
+                </thead>
+                <tbody id="sensorData" class="bg-white divide-y divide-gray-200">
+                    <!-- Údaje budú pridané prostredníctvom JavaScriptu -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    let temperatureChart = null;
+    let humidityChart = null;
+
+    // Funkcia na aktualizáciu údajov
+    function updateData() {
+        fetch('/get_sensor_data') // V tomto prípade musí server podporovať požiadavku na 20 senzorov
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data);
+                updateCharts(data);
+            })
+            .catch(error => console.error('Error fetching data:', error));
+    }
+
+    // Funkcia na aktualizáciu tabuľky
+    function updateTable(data) {
+        const tbody = document.getElementById('sensorData');
+        tbody.innerHTML = '';
+
+        data.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">${item.Sensor}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.Temperature}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.Humidity}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.Timestamp}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Funkcia na aktualizáciu grafov
+    function updateCharts(data) {
+        const labels = data.map(item => item.Sensor);  // Pole identifikátorov snímačov
+        const temperatures = data.map(item => item.Temperature);
+        const humidities = data.map(item => item.Humidity);
+
+        if (temperatureChart) {
+            temperatureChart.destroy();
+        }
+        if (humidityChart) {
+            humidityChart.destroy();
+        }
+
+        // Stĺpcový graf teploty
+        temperatureChart = new Chart(document.getElementById('temperatureChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,  // Pole identifikátorov snímačov
+                datasets: [{
+                    label: 'Teplota (°C)',
+                    data: temperatures,  // Pole hodnôt teploty pre každý snímač
+                    backgroundColor: 'rgb(239, 68, 68)',
+                }]
+            }
+        });
+
+        // Stĺpcový graf vlhkosti
+        humidityChart = new Chart(document.getElementById('humidityChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,  // Pole identifikátorov snímačov
+                datasets: [{
+                    label: 'Vlhkosť (%)',
+                    data: humidities,  // Pole hodnôt vlhkosti pre každý senzor
+                    backgroundColor: 'rgb(59, 130, 246)',
+                }]
+            }
+        });
+    }
+     fetch('/visualize_3d')
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('plotly-chart').innerHTML = html;
+        });
+    // Funkcia na stiahnutie logu
+    function downloadCurrentLog() {
+        const today = new Date().toISOString().split('T')[0];
+        window.location.href = `/download_log?date=${today}`;
+    }
+
+    // Aktualizácia údajov každých 5 sekúnd
+    updateData();
+    setInterval(updateData, 5000);
+</script>
+
+</body>
+</html>
